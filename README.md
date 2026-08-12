@@ -15,9 +15,7 @@ they work in any SteamVR game and compose with OVR Advanced Settings:
 
 ## Demo
 
-<video src="https://github.com/Spiritmarsrover/ImmersiveLocomotion/releases/download/v0.1.0/ImmersiveLocomotion-demo.mp4" controls muted width="100%"></video>
-
-▶ [Watch the demo video](https://github.com/Spiritmarsrover/ImmersiveLocomotion/releases/download/v0.1.0/ImmersiveLocomotion-demo.mp4) (if it doesn't play inline above).
+▶ **[Watch the demo](https://github.com/Spiritmarsrover/ImmersiveLocomotion/releases/download/v0.1.0/ImmersiveLocomotion-demo.mp4)** (hosted on the v0.1.0 release).
 
 ## Mode 1: Rollerblade boost
 
