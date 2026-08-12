@@ -2,7 +2,7 @@
   "source": "builtin",
   "applications": [
     {
-      "app_key": "titan.immersive_locomotion",
+      "app_key": "spiritmarsrover.immersive_locomotion",
       "launch_type": "binary",
       "binary_path_windows": "..\\immersive_locomotion.exe",
       "is_dashboard_overlay": true,

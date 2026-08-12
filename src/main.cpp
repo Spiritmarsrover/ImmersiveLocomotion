@@ -77,7 +77,7 @@ int main()
     const std::string appManifest = dir + "\\manifest\\immersive_locomotion.vrmanifest";
     vr::VRApplications()->AddApplicationManifest( appManifest.c_str() );
     vr::VRApplications()->IdentifyApplication(
-        GetCurrentProcessId(), "titan.immersive_locomotion" );
+        GetCurrentProcessId(), "spiritmarsrover.immersive_locomotion" );
 
     Config cfg;
     cfg.path = dir + "\\immersive_locomotion.ini";
@@ -268,7 +268,7 @@ int main()
         if ( ui.consumeQuit() )
             g_running = false;
         if ( ui.consumeOpenBindings() )
-            vr::VRInput()->OpenBindingUI( "titan.immersive_locomotion",
+            vr::VRInput()->OpenBindingUI( "spiritmarsrover.immersive_locomotion",
                                           vr::k_ulInvalidActionSetHandle,
                                           vr::k_ulInvalidInputValueHandle,
                                           false );

@@ -148,7 +148,7 @@ on the desktop.
 
 ## Bindings
 
-The app registers an application manifest (`titan.immersive_locomotion`)
+The app registers an application manifest (`spiritmarsrover.immersive_locomotion`)
 and an action manifest, so bindings are fully rebindable in **SteamVR
 Settings → Controllers → Manage Controller Bindings → Immersive
 Locomotion**. Default on Index: **left trackpad vertical, full range** —

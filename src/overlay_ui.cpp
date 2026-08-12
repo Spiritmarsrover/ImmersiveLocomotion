@@ -8,7 +8,7 @@
 
 namespace
 {
-const char* kOverlayKey = "titan.immersive_locomotion";
+const char* kOverlayKey = "spiritmarsrover.immersive_locomotion";
 
 // double-backed ImGui slider helper
 bool sliderD( const char* label, double& v, float lo, float hi,

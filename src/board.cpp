@@ -63,7 +63,7 @@ bool Board::init( const std::string& baseDir )
     if ( !vr::VROverlay() )
         return false;
     vr::EVROverlayError err = vr::VROverlay()->CreateOverlay(
-        "titan.il.board", "IL Board", &m_overlay );
+        "spiritmarsrover.il.board", "IL Board", &m_overlay );
     if ( err != vr::VROverlayError_None )
     {
         std::fprintf( stderr, "Board overlay create failed: %d\n", err );
@@ -74,7 +74,7 @@ bool Board::init( const std::string& baseDir )
     vr::VROverlay()->SetOverlaySortOrder( m_overlay, 0 );
 
     // mini board: stowed-at-hip grab indicator, follows the hand while held
-    err = vr::VROverlay()->CreateOverlay( "titan.il.board_mini",
+    err = vr::VROverlay()->CreateOverlay( "spiritmarsrover.il.board_mini",
                                           "IL Board (stowed)", &m_mini );
     if ( err == vr::VROverlayError_None )
     {
