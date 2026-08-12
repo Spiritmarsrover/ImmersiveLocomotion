@@ -1,0 +1,52 @@
+{
+  "default_bindings": [
+    {
+      "controller_type": "knuckles",
+      "binding_url": "bindings_knuckles.json"
+    }
+  ],
+  "actions": [
+    {
+      "name": "/actions/main/in/boost_stick",
+      "requirement": "suggested",
+      "type": "vector2"
+    },
+    {
+      "name": "/actions/main/in/boost_trigger",
+      "requirement": "optional",
+      "type": "vector1"
+    },
+    {
+      "name": "/actions/main/in/boost_touch",
+      "requirement": "optional",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/main/in/grab_left",
+      "requirement": "optional",
+      "type": "boolean"
+    },
+    {
+      "name": "/actions/main/in/grab_right",
+      "requirement": "optional",
+      "type": "boolean"
+    }
+  ],
+  "action_sets": [
+    {
+      "name": "/actions/main",
+      "usage": "leftright"
+    }
+  ],
+  "localization": [
+    {
+      "language_tag": "en_US",
+      "/actions/main": "Immersive Locomotion",
+      "/actions/main/in/boost_stick": "Boost (stick/trackpad axis)",
+      "/actions/main/in/boost_trigger": "Boost (trigger)",
+      "/actions/main/in/boost_touch": "Boost touch gate (trackpad touch)",
+      "/actions/main/in/grab_left": "Board grab (left hand)",
+      "/actions/main/in/grab_right": "Board grab (right hand)"
+    }
+  ]
+}

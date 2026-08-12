@@ -1,0 +1,24 @@
+# Build output
+/build/
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.obj
+
+# Runtime / user files
+immersive_locomotion.ini
+*.dat
+*.dat.log
+playspace_offset.dat*
+
+# IDE / OS
+.vs/
+.vscode/
+*.user
+Thumbs.db
+.DS_Store
+
+# CMake local caches (in case someone configures in-tree)
+CMakeCache.txt
+CMakeFiles/

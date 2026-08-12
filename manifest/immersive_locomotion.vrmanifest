@@ -1,0 +1,17 @@
+{
+  "source": "builtin",
+  "applications": [
+    {
+      "app_key": "titan.immersive_locomotion",
+      "launch_type": "binary",
+      "binary_path_windows": "..\\immersive_locomotion.exe",
+      "is_dashboard_overlay": true,
+      "strings": {
+        "en_us": {
+          "name": "Immersive Locomotion",
+          "description": "Rollerblade-style walking boost applied as a playspace offset."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "controller_type": "knuckles",
+  "name": "ImmersiveLocomotion defaults for Index",
+  "description": "Left trackpad vertical = boost, full range (bottom = 0, top = 1), gated on touch. Left trigger available as alternative source.",
+  "bindings": {
+    "/actions/main": {
+      "sources": [
+        {
+          "path": "/user/hand/left/input/trackpad",
+          "mode": "trackpad",
+          "inputs": {
+            "position": {
+              "output": "/actions/main/in/boost_stick"
+            },
+            "touch": {
+              "output": "/actions/main/in/boost_touch"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trigger",
+          "mode": "trigger",
+          "inputs": {
+            "pull": {
+              "output": "/actions/main/in/boost_trigger"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/grip",
+          "mode": "button",
+          "inputs": {
+            "click": {
+              "output": "/actions/main/in/grab_left"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/grip",
+          "mode": "button",
+          "inputs": {
+            "click": {
+              "output": "/actions/main/in/grab_right"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

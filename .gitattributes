@@ -1,0 +1,7 @@
+# Normalize line endings; let git decide per-file.
+* text=auto
+
+# Binary assets — never touch.
+*.png binary
+*.lib binary
+*.dll binary

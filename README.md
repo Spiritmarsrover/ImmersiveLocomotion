@@ -1,0 +1,182 @@
+# ImmersiveLocomotion
+
+SteamVR overlay with two locomotion modes that assist Manual Redirected
+Walking, both applied as a playspace offset (chaperone universe move) so
+they work in any SteamVR game and compose with OVR Advanced Settings:
+
+1. **Rollerblade boost** — proportional velocity added to real walking.
+2. **Electric board** — Onewheel-inspired lean-to-ride board you throw
+   down, mount in skateboard stance, and control by shifting your weight.
+
+## Mode 1: Rollerblade boost
+
+```
+artificial velocity = gain * clamp01(input) * real velocity   (hip-weighted)
+total in-game velocity = real + artificial                    (max (1+gain)x)
+```
+
+- **Real velocity** — weighted average of every tracked device (6-point FBT
+  friendly: waist weighted highest, then feet/HMD, hands lowest), horizontal
+  component, EWMA-smoothed, with an idle-sway deadband. Measured in raw
+  tracking space so it is immune to playspace offsets, including our own.
+- **Direction** — the boost amplifies the direction you are physically
+  walking. A `max(0, dot(velocity, hip_forward))^n` weight fades the boost
+  outside the hip-forward band (waist tracker if present, else HMD;
+  exponent 0 = omnidirectional). Waist tracker mounting is handled by the
+  **Calibrate hip direction** button in the dashboard panel: face your head
+  the same way as your hips, click, and the yaw offset is measured and
+  saved — no guessing.
+- **Momentum** — asymmetric first-order envelope on the boost vector:
+  `attack_time` spin-up while engaging, `release_time` glide when input or
+  real speed drops. Release is never hard-disabled; both are tunable.
+- **Stamina** — a tank measured in meters of artificial distance. Drains per
+  boosted meter, recharges per real meter walked unboosted (plus optional
+  passive regen). `max = 0` disables the system (infinite). Hysteresis
+  (`min_to_engage`) prevents flapping at empty.
+
+## Playspace backend / OVRAS compatibility
+
+Motion is applied in **episodes**. When boost engages, the live chaperone
+state is captured as a baseline (`RevertWorkingCopy` +
+`GetWorkingStandingZeroPose`/bounds); every active frame the accumulated
+offset is written to the working copy and shown with
+`ShowWorkingSetPreview` — no commits, no chaperone events, no async races.
+Once the boost has settled for 0.5 s, the final state is committed to Live
+once and the preview is hidden.
+
+Baselines are re-read at every episode start, so offsets committed by other
+tools (OVRAS space drag/turn) between episodes are absorbed and the two
+apps compose.
+
+Collision bounds are deliberately untouched while previewing: the
+compositor draws the chaperone grid from the working *bounds* but the
+*live* pose during a preview, so baseline bounds already render fixed to
+the physical room. At commit, `adjust_bounds` (default on)
+counter-translates the corners once (`corner' = corner + R_S^-1 * total`),
+which makes the committed state render at the identical physical spot —
+walls never move and nothing snaps.
+
+(Per-frame `CommitWorkingCopy(Live)` — the first implementation — is racy:
+Revert can read a live state that hasn't absorbed the previous frame's
+commit, losing/doubling deltas and desyncing pose from bounds. Symptoms:
+flicker, position jumps, chaperone drifting off the room.)
+
+The mover accumulates a raw-side rigid transform `M` (translation deltas
+plus yaw about a raw-space pivot) and applies `S = M * S0`. Board carving
+uses the yaw term; boost uses translation only. The commit-time bounds
+counter-transform generalizes to `corner' = S0^-1 * M^-1 * S0 * corner`,
+which reduces to `corner + R_S^-1 * total` for the translation-only case.
+
+## Mode 2: Electric board
+
+Onewheel-inspired, skateboard stance. Lifecycle is a state machine
+(`src/board.cpp`): **stowed** on your belt → **held** when you grip near
+your hip → **landed** when you release (thrown out in front, tail down) →
+**rear mounted** (rear foot on the tail) → **active** (front foot on, you
+ride). A small billboarded board marks the grab point at your belt at all
+times; the full board is a world-anchored floor overlay that stays fixed
+to your physical room (drawn in raw space, re-projected to standing space
+each frame) and recolors per phase.
+
+- **Lean input** — a center-of-mass estimate (weighted device positions,
+  hip corrected by the calibrated offset) projected onto the line between
+  your feet. `along` = accelerate/brake, `lateral` = carve. Normalized by
+  half your stance length; a deadzone rejects idle sway.
+- **Ride physics** — `v' = accel_gain * lean - drag * v * |v|`, so a held
+  lean approaches a terminal speed and neutral stance coasts (matches a
+  real balance-loop board). Speed is capped at `board_max_speed`.
+- **Turning** — two regimes that hand off around `pivot_speed`. At low
+  speed, fast front-foot motion opens a **pivot gate** that suspends lean
+  input so you physically rotate your body (the board tracks your feet
+  line). At speed, lateral lean drives **artificial yaw** about a
+  configurable center (`feet | com | hmd`).
+- **Mount/dismount** — rear foot first, then front. Dismount by raising
+  either foot `dismount_raise` above its planted height (a running minimum,
+  so the threshold is honest), or a horizontal bail above pivot speed. The
+  board auto-returns to your belt; a `mount_grace` window prevents the
+  settling step from instantly dismounting you. Activation lifts you a few
+  cm as a "board is live" cue.
+- **Hip offset calibration** — many users wear the hip tracker on the side.
+  The **Calibrate hip offset** button stores the midpoint between your
+  controllers (held at your hips) in tracker-local space, so the CoM sits
+  at your true center. Shared with mode 1's hip-forward.
+
+Mounting the board suspends the rollerblade input path until you step off.
+
+## VRChat avatar (OSC)
+
+The overlay can drive a VRChat avatar over OSC so a OneWheel-style board
+appears while you ride and its wheel spins with your speed. Enable the
+**OSC** tab (sends `IL_BoardActive` / `IL_BoardSpeed` to `127.0.0.1:9000`),
+and use the Unity editor tool in [`unity/`](unity/README.md) to generate the
+animator, clips and synced expression parameters on your avatar.
+
+## Build
+
+Dependencies (OpenVR SDK, Dear ImGui) are git submodules — fetch them first:
+
+```
+git clone --recurse-submodules https://github.com/<you>/ImmersiveLocomotion.git
+# or, if already cloned:
+git submodule update --init --recursive
+```
+
+Then configure and build (Windows / MSVC):
+
+```
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+```
+
+Output: `build/Release/immersive_locomotion.exe` (+ `openvr_api.dll` and
+`manifest/` copied alongside).
+
+## Run & tune
+
+Run the exe. An **"Immersive Locomotion" panel appears in the SteamVR
+dashboard** — enable/disable toggle at the top, live status (speeds, hip
+weight, stamina bar, boosted distance), and sliders for every model
+parameter. Edits auto-save (debounced 1 s) to
+`immersive_locomotion.ini`, which is created next to the exe on first run
+and also hot-reloads if edited by hand; the console window mirrors status
+on the desktop.
+
+## Bindings
+
+The app registers an application manifest (`titan.immersive_locomotion`)
+and an action manifest, so bindings are fully rebindable in **SteamVR
+Settings → Controllers → Manage Controller Bindings → Immersive
+Locomotion**. Default on Index: **left trackpad vertical, full range** —
+bottom = 0, top = 1 (`stick_mode = fullrange`), gated on trackpad *touch*
+so an untouched pad reads 0 rather than 0.5. This keeps boost completely
+independent of the right stick (snap turn) so you never drop speed while
+turning. `stick_mode = forward` restores plain thumbstick behavior
+(clamp01 of the vertical axis). The left trigger is pre-wired as an
+alternative source (`source = trigger` or `both`). The overlay emits no
+haptics of its own.
+
+Board mode uses the **left and right grips** (grab board) plus your feet
+and hip trackers. Same rebinding path applies. Note: the grip press is
+also seen by the focused game, so the game's own grab haptic/behavior may
+fire — rebind grab to a chord or spare button if that conflicts.
+
+Note: if SteamVR cached an older binding for this app, open Manage
+Controller Bindings once and reselect the default binding.
+
+## Notes
+
+- Playspace offsets bypass game collision (you can clip geometry) and, in
+  VRChat, move you the same way any playspace mover does.
+- If both this overlay and OVRAS actively move space in the same instant,
+  last commit wins for that frame; in practice interleaved commits compose.
+- Board mode needs at least both feet + hip tracked for lean; it degrades
+  gracefully (no lean, no ride) when they drop out.
+- Modes are "velocity/transform sources" feeding one shared mover
+  (`src/mover.cpp`); `src/boost_model.cpp` and `src/board.cpp` are isolated
+  so more modes can slot in.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Bundled dependencies keep their own licenses:
+[OpenVR](https://github.com/ValveSoftware/openvr) (BSD-3-Clause) and
+[Dear ImGui](https://github.com/ocornut/imgui) (MIT), included as submodules.
