@@ -13,6 +13,12 @@ they work in any SteamVR game and compose with OVR Advanced Settings:
 2. **Electric board** — Onewheel-inspired lean-to-ride board you throw
    down, mount in skateboard stance, and control by shifting your weight *FBT Requried.
 
+## Demo
+
+<video src="https://github.com/Spiritmarsrover/ImmersiveLocomotion/releases/download/v0.1.0/ImmersiveLocomotion-demo.mp4" controls muted width="100%"></video>
+
+▶ [Watch the demo video](https://github.com/Spiritmarsrover/ImmersiveLocomotion/releases/download/v0.1.0/ImmersiveLocomotion-demo.mp4) (if it doesn't play inline above).
+
 ## Mode 1: Rollerblade boost
 
 ```
