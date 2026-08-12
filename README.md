@@ -9,9 +9,9 @@ SteamVR overlay with two locomotion modes that assist Manual Redirected
 Walking, both applied as a playspace offset (chaperone universe move) so
 they work in any SteamVR game and compose with OVR Advanced Settings:
 
-1. **Rollerblade boost** — proportional velocity added to real walking.
+1. **Rollerblade boost** — proportional velocity added to real walking *Can work without FBT.
 2. **Electric board** — Onewheel-inspired lean-to-ride board you throw
-   down, mount in skateboard stance, and control by shifting your weight.
+   down, mount in skateboard stance, and control by shifting your weight *FBT Requried.
 
 ## Mode 1: Rollerblade boost
 
