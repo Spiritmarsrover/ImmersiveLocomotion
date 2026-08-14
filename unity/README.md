@@ -25,12 +25,21 @@ players see the board and its spin.
    at your feet in the pose you ride.
 4. **Tools ▸ Immersive Locomotion ▸ Setup Board**, assign the avatar, board
    root and wheel, and click **Generate**. This creates the animator + clips,
-   adds the two synced parameters, and — with **Auto-add VRCFury** left on —
-   **wires up a VRCFury Full Controller for you** on an `IL_Board_VRCFury`
-   object (drag-and-drop; nothing to configure). Board→feet **constraints are
-   set up separately** — the script does not touch them.
+   adds the two synced parameters, and — with the options left on —
+   **wires up a VRCFury Full Controller** (on an `IL_Board_VRCFury` object) and
+   the **board→feet VRC constraints** for you. Drag-and-drop; nothing to wire
+   by hand.
 5. Upload. In VRChat, enable OSC (it's on by default), enable the overlay's OSC
    tab, and ride — the board appears when active and the wheel spins with speed.
+
+### Board → feet constraints
+With **Set up board→feet VRC constraints** on, Generate adds an
+`IL_FootAnchor_L/R` empty on each foot bone (humanoid rig required) and puts a
+**VRCPositionConstraint** (both anchors, so the board sits at your feet
+midpoint) plus a **VRCAimConstraint** (one anchor, so the board aligns down
+your stance line) on the board root. Tune **Foot anchor offset** (its X is
+mirrored per foot) and **Board aim axis** (the board-local axis that should
+point along the stance) to fit your model.
 
 If you turn Auto-add off (or don't have VRCFury), add a **VRCFury ▸ Full
 Controller** yourself: Controller = `IL_Board.controller`, Parameters =

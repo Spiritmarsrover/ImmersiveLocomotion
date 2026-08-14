@@ -2,9 +2,8 @@
 // Immersive Locomotion — OneWheel/skateboard board avatar setup.
 //
 // Generates the animator, clips and synced parameters that the overlay's OSC
-// output drives. Merge the generated controller with VRCFury (Full Controller)
-// so nothing on your base avatar is overwritten. Constraints (board -> feet)
-// are set up by you separately.
+// output drives, and (optionally) auto-wires a VRCFury Full Controller and the
+// board -> feet VRC constraints so the board is drag-and-drop.
 //
 // Overlay -> VRChat OSC parameters (sent by immersive_locomotion.exe):
 //   IL_BoardActive : Bool   — true while the board is active (you're riding)
@@ -29,6 +28,15 @@ public class ILBoardSetup : EditorWindow
     float wheelDegPerSec = 720f; // spin rate at full IL_BoardSpeed
     bool autoVrcfury = true; // auto-add a VRCFury Full Controller (drag-drop)
 
+    // board -> feet: two anchor empties (one per foot bone) drive a VRC
+    // position constraint (board sits at the feet midpoint) + an aim
+    // constraint (board aligns along the stance line)
+    bool setupFeetConstraints = true;
+    // local offset of each anchor on its foot bone; x is mirrored per side
+    Vector3 footAnchorOffset = new Vector3( 0.009f, 0.148f, -0.012f );
+    Vector3 boardAimAxis = new Vector3( -1, 0, 0 ); // board axis that aims down
+                                                    // the stance line
+
     // optional motor sound: one-pitch loop whose volume + pitch scale with
     // |IL_BoardSpeed|
     AudioClip motorClip;
@@ -52,10 +60,10 @@ public class ILBoardSetup : EditorWindow
     {
         EditorGUILayout.HelpBox(
             "Assign your avatar, the board root (toggled) and the wheel "
-                + "transform (spins), then Generate. With 'Auto-add VRCFury' "
-                + "on, a VRCFury Full Controller is wired up for you "
-                + "(drag-and-drop, nothing to configure). Constraints are "
-                + "handled separately.",
+                + "transform (spins), then Generate. With the options below on, "
+                + "a VRCFury Full Controller and the board->feet VRC "
+                + "constraints are set up for you (drag-and-drop, nothing to "
+                + "configure).",
             MessageType.Info );
 
         avatar = (VRCAvatarDescriptor)EditorGUILayout.ObjectField(
@@ -97,6 +105,16 @@ public class ILBoardSetup : EditorWindow
         EditorGUILayout.Space();
         autoVrcfury = EditorGUILayout.ToggleLeft(
             "Auto-add VRCFury Full Controller (recommended)", autoVrcfury );
+
+        setupFeetConstraints = EditorGUILayout.ToggleLeft(
+            "Set up board->feet VRC constraints", setupFeetConstraints );
+        using ( new EditorGUI.DisabledScope( !setupFeetConstraints ) )
+        {
+            footAnchorOffset = EditorGUILayout.Vector3Field(
+                "Foot anchor offset (x mirrored)", footAnchorOffset );
+            boardAimAxis = EditorGUILayout.Vector3Field( "Board aim axis",
+                                                         boardAimAxis );
+        }
 
         using ( new EditorGUI.DisabledScope(
             avatar == null || boardRoot == null || wheel == null ) )
@@ -174,6 +192,11 @@ public class ILBoardSetup : EditorWindow
             }
         }
 
+        // --- board -> feet VRC constraints ---
+        bool constrained = false;
+        if ( setupFeetConstraints )
+            constrained = TrySetupFeetConstraints();
+
         string msg = "Generated in " + kOutDir + ":\n"
             + "  IL_Board.controller\n"
             + "  IL_Board_Params.asset  (IL_BoardActive, IL_BoardSpeed, both "
@@ -195,6 +218,12 @@ public class ILBoardSetup : EditorWindow
                  + "  - Parameters = IL_Board_Params.asset\n"
                  + "  - Global Parameters += 'IL_*'  (REQUIRED, or the OSC "
                  + "names won't match).";
+        if ( setupFeetConstraints )
+            msg += constrained
+                ? "\nFeet: IL_FootAnchor_L/R added on the foot bones + VRC "
+                  + "position/aim constraints on the board root."
+                : "\nFeet constraints skipped (needs a humanoid avatar with "
+                  + "foot bones and VRC Constraints in your SDK).";
 
         EditorUtility.DisplayDialog( "Immersive Locomotion", msg, "OK" );
         Selection.activeObject = wired ? (Object)holder : prms;
@@ -263,6 +292,108 @@ public class ILBoardSetup : EditorWindow
                 return t;
         }
         return null;
+    }
+
+    // Replicate the board->feet rig by reflection (so this compiles without
+    // the VRC Constraints package): an anchor empty on each foot bone, a
+    // VRCPositionConstraint on the board root averaging both anchors (board
+    // sits at the feet midpoint), and a VRCAimConstraint toward one anchor
+    // (board's aim axis aligns down the stance line). Returns false -> caller
+    // reports it was skipped.
+    bool TrySetupFeetConstraints()
+    {
+        System.Type posT = FindType(
+            "VRC.SDK3.Dynamics.Constraint.Components.VRCPositionConstraint" );
+        System.Type aimT = FindType(
+            "VRC.SDK3.Dynamics.Constraint.Components.VRCAimConstraint" );
+        System.Type srcT = FindType( "VRC.Dynamics.VRCConstraintSource" );
+        if ( posT == null || aimT == null || srcT == null )
+            return false;
+
+        var anim = avatar.GetComponent<Animator>();
+        if ( anim == null || !anim.isHuman )
+            return false;
+        var lFoot = anim.GetBoneTransform( HumanBodyBones.LeftFoot );
+        var rFoot = anim.GetBoneTransform( HumanBodyBones.RightFoot );
+        if ( lFoot == null || rFoot == null )
+            return false;
+
+        Transform lAnchor = MakeFootAnchor(
+            lFoot, "IL_FootAnchor_L",
+            new Vector3( -footAnchorOffset.x, footAnchorOffset.y,
+                         footAnchorOffset.z ) );
+        Transform rAnchor = MakeFootAnchor(
+            rFoot, "IL_FootAnchor_R",
+            new Vector3( footAnchorOffset.x, footAnchorOffset.y,
+                         footAnchorOffset.z ) );
+
+        // remove any board->feet constraints we added on a previous run
+        foreach ( var c in boardRoot.GetComponents<Component>() )
+            if ( c != null && ( c.GetType() == posT || c.GetType() == aimT ) )
+                Undo.DestroyObjectImmediate( c );
+
+        var pos = Undo.AddComponent( boardRoot, posT );
+        SetMember( pos, "IsActive", true );
+        SetMember( pos, "AffectsPositionX", true );
+        SetMember( pos, "AffectsPositionY", true );
+        SetMember( pos, "AffectsPositionZ", true );
+        AddConstraintSource( pos, srcT, lAnchor, 1f );
+        AddConstraintSource( pos, srcT, rAnchor, 1f );
+
+        var aim = Undo.AddComponent( boardRoot, aimT );
+        SetMember( aim, "IsActive", true );
+        SetMember( aim, "AffectsRotationX", true );
+        SetMember( aim, "AffectsRotationY", true );
+        SetMember( aim, "AffectsRotationZ", true );
+        SetMember( aim, "AimAxis", boardAimAxis );
+        SetMember( aim, "UpAxis", new Vector3( 0, 1, 0 ) );
+        AddConstraintSource( aim, srcT, rAnchor, 1f );
+        return true;
+    }
+
+    Transform MakeFootAnchor( Transform foot, string name, Vector3 localOffset )
+    {
+        var prev = foot.Find( name );
+        if ( prev != null )
+            Undo.DestroyObjectImmediate( prev.gameObject );
+        var go = new GameObject( name );
+        Undo.RegisterCreatedObjectUndo( go, "IL foot anchor" );
+        go.transform.SetParent( foot, false );
+        go.transform.localPosition = localOffset;
+        go.transform.localRotation = Quaternion.identity;
+        return go.transform;
+    }
+
+    static void AddConstraintSource( object constraint, System.Type srcT,
+                                     Transform src, float weight )
+    {
+        object sources = GetMember( constraint, "Sources" );
+        var ctor = srcT.GetConstructor( new[] {
+            typeof( Transform ), typeof( float ), typeof( Vector3 ),
+            typeof( Vector3 ) } );
+        if ( sources == null || ctor == null )
+            return;
+        object entry = ctor.Invoke(
+            new object[] { src, weight, Vector3.zero, Vector3.zero } );
+        sources.GetType().GetMethod( "Add", new[] { srcT } )
+            ?.Invoke( sources, new[] { entry } );
+    }
+
+    static void SetMember( object o, string name, object value )
+    {
+        var f = o.GetType().GetField( name );
+        if ( f != null ) { f.SetValue( o, value ); return; }
+        var p = o.GetType().GetProperty( name );
+        if ( p != null && p.CanWrite )
+            p.SetValue( o, value );
+    }
+
+    static object GetMember( object o, string name )
+    {
+        var f = o.GetType().GetField( name );
+        if ( f != null )
+            return f.GetValue( o );
+        return o.GetType().GetProperty( name )?.GetValue( o );
     }
 
     AnimationClip ToggleClip( string path, bool active, string name )
