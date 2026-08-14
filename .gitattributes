@@ -5,3 +5,6 @@
 *.png binary
 *.lib binary
 *.dll binary
+*.fbx binary
+*.wav binary
+*.mp3 binary
