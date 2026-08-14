@@ -13,6 +13,7 @@
 // Menu: Tools ▸ Immersive Locomotion ▸ Setup Board
 
 using System.IO;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -24,8 +25,9 @@ public class ILBoardSetup : EditorWindow
     VRCAvatarDescriptor avatar;
     GameObject boardRoot; // parent of the board mesh; toggled on/off
     Transform wheel;      // the wheel mesh transform that spins
-    Vector3 spinAxis = new Vector3( 1, 0, 0 ); // wheel local spin axis
+    Vector3 spinAxis = new Vector3( 0, 0, 1 ); // wheel local spin axis (Z)
     float wheelDegPerSec = 720f; // spin rate at full IL_BoardSpeed
+    bool autoVrcfury = true; // auto-add a VRCFury Full Controller (drag-drop)
 
     // optional motor sound: one-pitch loop whose volume + pitch scale with
     // |IL_BoardSpeed|
@@ -50,9 +52,10 @@ public class ILBoardSetup : EditorWindow
     {
         EditorGUILayout.HelpBox(
             "Assign your avatar, the board root (toggled) and the wheel "
-                + "transform (spins). Generate, then add a VRCFury 'Full "
-                + "Controller' pointing at the generated controller. "
-                + "Constraints are handled separately.",
+                + "transform (spins), then Generate. With 'Auto-add VRCFury' "
+                + "on, a VRCFury Full Controller is wired up for you "
+                + "(drag-and-drop, nothing to configure). Constraints are "
+                + "handled separately.",
             MessageType.Info );
 
         avatar = (VRCAvatarDescriptor)EditorGUILayout.ObjectField(
@@ -90,6 +93,10 @@ public class ILBoardSetup : EditorWindow
                 "Spatial volumetric radius (m)", motorVolumetricRadius, 0f,
                 5f );
         }
+
+        EditorGUILayout.Space();
+        autoVrcfury = EditorGUILayout.ToggleLeft(
+            "Auto-add VRCFury Full Controller (recommended)", autoVrcfury );
 
         using ( new EditorGUI.DisabledScope(
             avatar == null || boardRoot == null || wheel == null ) )
@@ -153,27 +160,109 @@ public class ILBoardSetup : EditorWindow
 
         AssetDatabase.SaveAssets();
 
-        EditorUtility.DisplayDialog(
-            "Immersive Locomotion",
-            "Generated in " + kOutDir + ":\n"
-                + "  IL_Board.controller\n"
-                + "  IL_Board_Params.asset  (IL_BoardActive, IL_BoardSpeed, "
-                + "both synced)\n"
-                + ( motorClip != null
-                        ? "  Motor audio: AudioSource added; volume + pitch "
-                          + "follow IL_BoardSpeed.\n"
-                        : "" )
-                + "\n"
-                + "In your VRCFury Full Controller:\n"
-                + "  - Controller = IL_Board.controller\n"
-                + "  - Parameters = IL_Board_Params.asset\n"
-                + "  - Global Parameters += 'IL_*'  (REQUIRED)\n\n"
-                + "Without the global entry VRCFury prefixes the params and "
-                + "the OSC names (/avatar/parameters/IL_BoardActive, "
-                + "IL_BoardSpeed) won't match.",
-            "OK" );
+        // --- drag-and-drop: auto-wire the VRCFury Full Controller ---
+        bool wired = false;
+        GameObject holder = null;
+        if ( autoVrcfury )
+        {
+            holder = MakeVrcfuryHolder();
+            wired = TryWireVrcfury( holder, ctrl, prms );
+            if ( !wired && holder != null )
+            {
+                Undo.DestroyObjectImmediate( holder );
+                holder = null;
+            }
+        }
 
-        Selection.activeObject = prms;
+        string msg = "Generated in " + kOutDir + ":\n"
+            + "  IL_Board.controller\n"
+            + "  IL_Board_Params.asset  (IL_BoardActive, IL_BoardSpeed, both "
+            + "synced)\n"
+            + ( motorClip != null
+                    ? "  Motor audio: AudioSource added; volume + pitch follow "
+                      + "IL_BoardSpeed.\n"
+                    : "" );
+        if ( wired )
+            msg += "\nVRCFury Full Controller auto-added on '" + holder.name
+                 + "' (controller + params merged, IL_* kept global). Nothing "
+                 + "else to wire - just set up your constraints and upload.";
+        else
+            msg += "\n"
+                 + ( autoVrcfury ? "VRCFury not found - add a Full Controller "
+                                   + "yourself:\n"
+                                 : "Add a VRCFury Full Controller yourself:\n" )
+                 + "  - Controller = IL_Board.controller\n"
+                 + "  - Parameters = IL_Board_Params.asset\n"
+                 + "  - Global Parameters += 'IL_*'  (REQUIRED, or the OSC "
+                 + "names won't match).";
+
+        EditorUtility.DisplayDialog( "Immersive Locomotion", msg, "OK" );
+        Selection.activeObject = wired ? (Object)holder : prms;
+    }
+
+    // Fresh child under the avatar to hold the VRCFury component; destroyed
+    // and recreated each Generate so re-running never stacks duplicates.
+    GameObject MakeVrcfuryHolder()
+    {
+        var prev = avatar.transform.Find( "IL_Board_VRCFury" );
+        if ( prev != null )
+            Undo.DestroyObjectImmediate( prev.gameObject );
+        var go = new GameObject( "IL_Board_VRCFury" );
+        Undo.RegisterCreatedObjectUndo( go, "IL VRCFury" );
+        go.transform.SetParent( avatar.transform, false );
+        return go;
+    }
+
+    // Wire a VRCFury Full Controller entirely through its public API by
+    // reflection, so this script compiles with or without VRCFury installed
+    // (returns false -> caller falls back to manual instructions). The base
+    // object is overridden to the avatar root so the avatar-relative clip
+    // paths resolve no matter where the holder sits.
+    bool TryWireVrcfury( GameObject holder, RuntimeAnimatorController ctrl,
+                         VRCExpressionParameters prms )
+    {
+        System.Type fc = FindType( "com.vrcfury.api.FuryComponents" );
+        var create = fc?.GetMethod(
+            "CreateFullController", BindingFlags.Public | BindingFlags.Static,
+            null, new[] { typeof( GameObject ) }, null );
+        if ( create == null )
+            return false;
+
+        object fury = create.Invoke( null, new object[] { holder } );
+        if ( fury == null )
+            return false;
+        System.Type ft = fury.GetType();
+
+        ft.GetMethod( "AddController",
+                      new[] { typeof( RuntimeAnimatorController ),
+                              typeof( VRCAvatarDescriptor.AnimLayerType ) } )
+            ?.Invoke( fury, new object[] {
+                          ctrl, VRCAvatarDescriptor.AnimLayerType.FX } );
+        ft.GetMethod( "AddParams", new[] { typeof( VRCExpressionParameters ) } )
+            ?.Invoke( fury, new object[] { prms } );
+        var addGlobal = ft.GetMethod( "AddGlobalParam",
+                                      new[] { typeof( string ) } );
+        addGlobal?.Invoke( fury, new object[] { kActiveParam } );
+        addGlobal?.Invoke( fury, new object[] { kSpeedParam } );
+
+        // point the Full Controller's base object at the avatar root
+        var model = ft.GetField( "c",
+                                 BindingFlags.NonPublic | BindingFlags.Instance )
+                        ?.GetValue( fury );
+        model?.GetType().GetField( "rootObjOverride" )
+            ?.SetValue( model, avatar.gameObject );
+        return true;
+    }
+
+    static System.Type FindType( string fullName )
+    {
+        foreach ( var a in System.AppDomain.CurrentDomain.GetAssemblies() )
+        {
+            var t = a.GetType( fullName );
+            if ( t != null )
+                return t;
+        }
+        return null;
     }
 
     AnimationClip ToggleClip( string path, bool active, string name )
@@ -187,43 +276,52 @@ public class ILBoardSetup : EditorWindow
         return clip;
     }
 
-    // One linear revolution about the wheel's dominant local axis. Only that
-    // one euler axis is animated (the other two keep the wheel's authored
-    // orientation), the curve is truly linear (constant angular velocity), and
-    // the clip is exactly one revolution long so there is no frozen tail.
+    // One linear revolution about the wheel's dominant local axis, starting
+    // from the wheel's *authored* local rotation so the spin neither snaps the
+    // wheel to zero nor loses any authored tilt. All three euler axes are
+    // written (the spin axis advances 360 deg, the other two are held at their
+    // authored angle), which fully defines the rotation for Write-Defaults-off.
+    // The curve is truly linear (constant angular velocity) and exactly one
+    // revolution long, so there is no frozen tail.
     AnimationClip SpinClip( string path )
     {
         var clip = new AnimationClip();
         float dur = 360f / Mathf.Max( 1f, wheelDegPerSec );
 
+        Vector3 e0 = wheel.localEulerAngles; // authored orientation
+
         Vector3 s = spinAxis.normalized;
         float ax = Mathf.Abs( s.x ), ay = Mathf.Abs( s.y ), az = Mathf.Abs( s.z );
-        string prop;
+        int axis;
         float sign;
-        if ( ax >= ay && ax >= az )
-        {
-            prop = "localEulerAnglesRaw.x";
-            sign = s.x < 0 ? -1f : 1f;
-        }
-        else if ( ay >= az )
-        {
-            prop = "localEulerAnglesRaw.y";
-            sign = s.y < 0 ? -1f : 1f;
-        }
-        else
-        {
-            prop = "localEulerAnglesRaw.z";
-            sign = s.z < 0 ? -1f : 1f;
-        }
+        if ( ax >= ay && ax >= az ) { axis = 0; sign = s.x < 0 ? -1f : 1f; }
+        else if ( ay >= az ) { axis = 1; sign = s.y < 0 ? -1f : 1f; }
+        else { axis = 2; sign = s.z < 0 ? -1f : 1f; }
 
-        var curve = AnimationCurve.Linear( 0f, 0f, dur, 360f * sign );
-        clip.SetCurve( path, typeof( Transform ), prop, curve );
+        SpinAxisCurve( clip, path, "localEulerAnglesRaw.x", e0.x, axis == 0,
+                       sign, dur );
+        SpinAxisCurve( clip, path, "localEulerAnglesRaw.y", e0.y, axis == 1,
+                       sign, dur );
+        SpinAxisCurve( clip, path, "localEulerAnglesRaw.z", e0.z, axis == 2,
+                       sign, dur );
 
         var settings = AnimationUtility.GetAnimationClipSettings( clip );
         settings.loopTime = true;
         AnimationUtility.SetAnimationClipSettings( clip, settings );
         AssetDatabase.CreateAsset( clip, kOutDir + "/IL_WheelSpin.anim" );
         return clip;
+    }
+
+    // Spin axis: one linear revolution from `start`. Other axes: constant at
+    // `start` (a flat curve over the same duration).
+    static void SpinAxisCurve( AnimationClip clip, string path, string prop,
+                               float start, bool spinning, float sign,
+                               float dur )
+    {
+        var curve = spinning
+            ? AnimationCurve.Linear( 0f, start, dur, start + 360f * sign )
+            : AnimationCurve.Linear( 0f, start, dur, start );
+        clip.SetCurve( path, typeof( Transform ), prop, curve );
     }
 
     // Motor: an AudioSource whose volume + pitch are driven by a 1D blend
