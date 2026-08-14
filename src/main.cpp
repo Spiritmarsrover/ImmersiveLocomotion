@@ -277,11 +277,18 @@ int main()
         {
             if ( body.hipPoseValid && body.headValid )
             {
-                // Body center = the HMD dropped straight down onto the
-                // horizontal plane at hip height. Stand upright facing
-                // forward and click — no controllers needed.
+                // Body center = the head center dropped straight down onto
+                // the horizontal plane at hip height. The HMD sits at the
+                // front of the face, ~10 cm ahead of the head's center, so
+                // back the reference off along the (horizontal) look
+                // direction first — otherwise the body-center estimate is
+                // biased forward and a balanced stance reads a false forward
+                // lean. Stand in your riding stance and click.
+                const double kHeadCenterBack = 0.10; // m, HMD -> head center
                 Vec3 hipPos = positionOf( body.hipPose );
-                Vec3 projected = { body.headPos.x, hipPos.y, body.headPos.z };
+                Vec3 headCenter
+                    = body.headPos - body.hmdForward * kHeadCenterBack;
+                Vec3 projected = { headCenter.x, hipPos.y, headCenter.z };
                 Vec3 local = rotateInverse( body.hipPose, projected - hipPos );
                 cfg.hipOffsetX = local.x;
                 cfg.hipOffsetY = local.y;

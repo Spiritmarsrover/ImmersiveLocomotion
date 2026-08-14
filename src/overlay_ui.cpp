@@ -347,8 +347,8 @@ void OverlayUI::buildUi( Config& cfg, const UiStatus& s )
             m_hipOffsetCalibrate = true;
         ImGui::SameLine();
         ImGui::TextDisabled( s.hipOffsetSet
-                                 ? "set - stand upright facing fwd to redo"
-                                 : "stand upright facing forward, then click" );
+                                 ? "set - stand in your riding stance to redo"
+                                 : "stand in your riding stance, then click" );
 
         static const char* stanceItems[] = { "regular", "goofy" };
         changed |= comboStr( "stance (regular = right foot rear)",
