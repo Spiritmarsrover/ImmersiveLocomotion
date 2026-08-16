@@ -126,6 +126,13 @@ appears while you ride and its wheel spins with your speed. Enable the
 and use the Unity editor tool in [`unity/`](unity/README.md) to generate the
 animator, clips and synced expression parameters on your avatar.
 
+**Wall-collision dismount (VRChat only).** Because playspace motion bypasses
+world collision, the overlay can dismount you the instant you would clip a
+wall: it reads a fan of VRChat `VRCRaycast` components back over OSC (the
+**Collision** tab, listening on `127.0.0.1:9001`) and, when the nearest ray
+hit is within the dismount distance while you're riding, kicks you off the
+board. The raycast-fan avatar setup is in [`unity/`](unity/README.md).
+
 ## Build
 
 Dependencies (OpenVR SDK, Dear ImGui) are git submodules — fetch them first:
