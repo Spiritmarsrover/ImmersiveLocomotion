@@ -269,10 +269,12 @@ public class ILBoardSetup : EditorWindow
                           ctrl, VRCAvatarDescriptor.AnimLayerType.FX } );
         ft.GetMethod( "AddParams", new[] { typeof( VRCExpressionParameters ) } )
             ?.Invoke( fury, new object[] { prms } );
+        // 'IL_*' keeps every IL_ parameter verbatim (no vf<n>_ prefix) so the
+        // OSC names match: the board params AND any IL_ PhysBone/Contact probe
+        // (e.g. IL_Probe_Angle) the overlay reads back.
         var addGlobal = ft.GetMethod( "AddGlobalParam",
                                       new[] { typeof( string ) } );
-        addGlobal?.Invoke( fury, new object[] { kActiveParam } );
-        addGlobal?.Invoke( fury, new object[] { kSpeedParam } );
+        addGlobal?.Invoke( fury, new object[] { "IL_*" } );
 
         // point the Full Controller's base object at the avatar root
         var model = ft.GetField( "c",
