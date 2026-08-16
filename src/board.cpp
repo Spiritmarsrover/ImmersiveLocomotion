@@ -124,6 +124,15 @@ void Board::setPhase( BoardPhase p )
     }
 }
 
+void Board::forceDismount()
+{
+    if ( m_phase != BoardPhase::Stowed )
+        setPhase( BoardPhase::Stowed );
+    m_simSpeed = 0.0;   // hard stop, no glide-out
+    m_pivotGate = 0.0;
+    m_mountGrace = 0.0;
+}
+
 void Board::land( const BodyState& body, const Config& cfg )
 {
     // Deterministic landing: throw_distance along the horizontal facing,
@@ -315,8 +324,11 @@ BoardStatus Board::update( const BodyState& body, bool grabLeft,
             {
                 Vec3 d = ( body.com - mid ).horizontal();
                 Vec3 perp = { -axis.z, 0.0, axis.x };
-                st.leanAlong = Vec3::dot( d, axis ) / halfStance;
-                st.leanLateral = Vec3::dot( d, perp ) / halfStance;
+                st.leanRawAlong = Vec3::dot( d, axis ) / halfStance;
+                st.leanRawLateral = Vec3::dot( d, perp ) / halfStance;
+                // subtract the zero-lean calibration so a balanced stance is 0
+                st.leanAlong = st.leanRawAlong - cfg.leanNeutralAlong;
+                st.leanLateral = st.leanRawLateral - cfg.leanNeutralLateral;
                 st.leanValid = true;
             }
         }
@@ -461,10 +473,10 @@ BoardStatus Board::update( const BodyState& body, bool grabLeft,
         }
         m_raiseTimer = raise ? m_raiseTimer + dt : 0.0;
 
-        // Horizontal bail only above pivot speed — below it, horizontal
-        // front-foot motion is the pivot gesture, not a dismount.
+        // Horizontal bail only above pivot speed AND not mid-pivot — a
+        // deliberate foot pivot (at any speed) must not dismount you.
         bool bail = false;
-        if ( std::fabs( m_simSpeed ) > cfg.pivotSpeed )
+        if ( std::fabs( m_simSpeed ) > cfg.pivotSpeed && m_pivotGate <= 0.0 )
         {
             bool rearOn = rearValid
                           && footInZone( footRear, -0.25,
@@ -498,7 +510,7 @@ BoardStatus Board::update( const BodyState& body, bool grabLeft,
         // re-alignment otherwise; position stays under the stance
         Vec3 feetLine
             = ( footFront - footRear ).horizontal().normalizedOrZero();
-        double atau = m_pivotGate > 0.0 ? 0.10 : 1.5;
+        double atau = m_pivotGate > 0.0 ? 0.10 : cfg.axisTau;
         if ( feetLine.length() > 0.5 )
         {
             double aa = 1.0 - std::exp( -dt / atau );
@@ -509,17 +521,20 @@ BoardStatus Board::update( const BodyState& body, bool grabLeft,
         m_tail = { mid.x - m_axis.x * cfg.boardLength * 0.5, m_floorY,
                    mid.z - m_axis.z * cfg.boardLength * 0.5 };
 
-        // low-speed pivot gate: fast front-foot motion means the rider is
-        // physically rotating — gate the lean input, freeze the speed
+        // pivot gate: fast front-foot motion means the rider is physically
+        // rotating — gate the lean input and freeze the speed. Allowed at any
+        // speed so you can foot-pivot while rolling, not just when slow.
         const Vec3& frontVel = goofy ? body.footRightVel : body.footLeftVel;
-        if ( std::fabs( m_simSpeed ) < cfg.pivotSpeed
-             && frontVel.length() > cfg.pivotFootSpeed )
+        if ( frontVel.length() > cfg.pivotFootSpeed )
             m_pivotGate = 0.20;
         else
             m_pivotGate -= dt;
-        st.pivoting = m_pivotGate > 0.0;
+        st.pivoting = m_pivotGate > 0.0; // now only speeds axis tracking
 
-        if ( !st.pivoting && st.leanValid && m_mountGrace <= 0.0 )
+        // Carve/throttle run continuously (no lockout) — a foot pivot must not
+        // eat lean inputs. Fast foot motion only quickens the axis tracking
+        // above, so a physical turn re-aligns the board without suspending lean.
+        if ( st.leanValid && m_mountGrace <= 0.0 )
         {
             auto deadzoned = []( double v, double dz ) {
                 if ( std::fabs( v ) <= dz )

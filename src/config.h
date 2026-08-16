@@ -89,6 +89,16 @@ struct Config
     double turnRate = 180.0;      // deg/s at full lateral lean (negative flips)
     double turnDeadzone = 0.01;   // normalized lateral lean ignored
     double pivotFootSpeed = 0.1;  // m/s front-foot speed that opens the gate
+    // how fast the board axis re-aligns to the feet line while NOT pivoting
+    // (s time-constant). Lower = axis follows your turn faster, so a slow
+    // foot-turn builds less spurious lateral lean (less unwanted carve);
+    // higher = steadier heading. During a pivot it snaps fast regardless.
+    double axisTau = 1.5;
+    // zero-lean calibration: neutral-stance lean captured by the Calibrate
+    // lean button, subtracted so a balanced stance reads 0 (separate from the
+    // hip-offset calibration). Per-user; left neutral by default.
+    double leanNeutralAlong = 0.0;
+    double leanNeutralLateral = 0.0;
     std::string rotationCenter = "feet"; // feet | com | hmd
 
     // [osc]  (drive a VRChat avatar over OSC)
@@ -101,6 +111,23 @@ struct Config
     std::string stickMode = "fullrange"; // fullrange: y -1..1 -> 0..1 (trackpad,
                                          // touch-gated); forward: clamp01(y)
     double stickFullAt = 0.76;    // stick input value that maps to full boost
+
+    // [osc_in]  (listen to VRChat's OSC output on 9001)
+    bool beaconEnabled = false;
+    double beaconPort = 9001;        // listen here (VRChat OSC out = 9001)
+
+    // [collision]  (wall-hit detection from a VRCRaycast fan on the avatar)
+    // Each ray publishes <rayParam>N_Hit (bool) and <rayParam>N_Distance (m)
+    // for N = 0..rayCount-1; the overlay reads them and dismounts when the
+    // nearest hit is closer than rayThreshold while you are commanding motion.
+    bool collisionDetect = false;
+    std::string rayParam = "IL_Ray";      // VRCRaycast Parameter prefix
+    double rayCount = 8;                  // number of rays in the fan
+    double rayThreshold = 0.15;           // m; nearest hit under this = a wall
+                                          // (keep >= the ray length so any hit
+                                          // counts; short ~0.1 m rays -> ~0.15)
+    double collisionHold = 0.3;           // s to keep the push cut after a hit
+    double collisionStartupIgnore = 0.25; // s of commanded motion before arming
 
     // -- not in the file --
     std::string path;

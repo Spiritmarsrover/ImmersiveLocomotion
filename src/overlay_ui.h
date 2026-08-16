@@ -34,6 +34,12 @@ struct UiStatus
     double offsetX = 0.0; // playspace offset we have applied, raw meters
     double offsetY = 0.0;
     double offsetZ = 0.0;
+    // OSC input + VRCRaycast fan
+    bool oscBound = false;       // listen socket is open (false = port in use)
+    bool rayValid = false;       // at least one ray reported a hit
+    double rayNearest = 0.0;     // nearest ray hit distance (m)
+    int rayHits = 0;             // rays currently hitting
+    bool collisionActive = false; // dismount currently held by a wall hit
 };
 
 class OverlayUI
@@ -51,6 +57,8 @@ public:
     bool consumeCalibrate();
     // True once after the user clicked "Calibrate hip offset".
     bool consumeHipOffsetCalibrate();
+    // True once after the user clicked "Calibrate lean (zero)".
+    bool consumeLeanCalibrate();
     // True once after the user clicked "Reset playspace offset".
     bool consumeResetHome();
     // True once after the user clicked "Exit" (quit the overlay).
@@ -88,6 +96,7 @@ private:
     bool m_imguiReady = false;
     bool m_calibrate = false;
     bool m_hipOffsetCalibrate = false;
+    bool m_leanCalibrate = false;
     bool m_resetHome = false;
     bool m_quit = false;
     bool m_openBindings = false;

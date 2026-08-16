@@ -106,6 +106,11 @@ int main()
         std::fprintf( stderr, "Board overlay unavailable.\n" );
 
     OscSender osc;
+    OscReceiver oscIn; // avatar-position beacon (/il/avatar_pos)
+
+    // wall-hit detection state (VRCRaycast fan)
+    double commandingTime = 0.0; // how long we've been commanding motion
+    double collisionTimer = 0.0; // > 0 while the push is suppressed post-hit
 
     float displayHz = vr::VRSystem()->GetFloatTrackedDeviceProperty(
         vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_DisplayFrequency_Float );
@@ -208,6 +213,62 @@ int main()
             statAccumBoost += boardSpeed * dt;
         }
         double yaw = bs.yawDelta;
+
+        // --- OSC input: read VRChat's OSC output (the VRCRaycast fan) ---
+        if ( cfg.beaconEnabled )
+        {
+            oscIn.bind( static_cast<int>( cfg.beaconPort ) );
+            oscIn.poll();
+        }
+
+        // --- wall-hit detection: a wall close in the raycast fan while we are
+        //     commanding motion = driving into a collider; dismount ---
+        bool commanding = ( cfg.enabled && appliedSpeed > 1e-4 )
+                          || boardSpeed > 1e-4;
+        commandingTime = commanding ? commandingTime + dt : 0.0;
+        double nearestWall = 1e9;
+        int rayHits = 0;
+        bool anyRay = false;
+        if ( cfg.beaconEnabled )
+        {
+            int n = static_cast<int>( cfg.rayCount );
+            for ( int i = 0; i < n; ++i )
+            {
+                std::string base = cfg.rayParam + std::to_string( i );
+                float hit = 0.0f, dist = 0.0f;
+                bool haveHit = oscIn.getParam( base + "_Hit", hit );
+                bool haveDist = oscIn.getParam( base + "_Distance", dist );
+                if ( !haveDist )
+                    continue;
+                anyRay = true;
+                // if no _Hit param is published, treat a positive distance as a
+                // hit; otherwise honor _Hit
+                bool isHit = haveHit ? ( hit > 0.5f ) : ( dist > 1e-4f );
+                if ( isHit )
+                {
+                    ++rayHits;
+                    if ( dist < nearestWall )
+                        nearestWall = dist;
+                }
+            }
+        }
+        if ( cfg.collisionDetect && commanding
+             && commandingTime > cfg.collisionStartupIgnore && rayHits > 0
+             && nearestWall < cfg.rayThreshold )
+        {
+            collisionTimer = cfg.collisionHold;
+            board.forceDismount(); // kick the rider off on a wall hit
+        }
+        bool collisionActive = collisionTimer > 0.0;
+        if ( collisionActive )
+        {
+            // block the horizontal noclip push, but KEEP frameDelta.y so the
+            // board's ride-lift still decays back down as it dismounts
+            frameDelta.x = 0.0;
+            frameDelta.z = 0.0;
+            yaw = 0.0;
+            collisionTimer -= dt;
+        }
         mover.update( frameDelta, yaw, bs.yawPivot, dt, cfg.adjustBounds );
 
         // --- OSC avatar output: board active + wheel speed (every frame, so
@@ -261,6 +322,11 @@ int main()
             st.offsetY = off.y;
             st.offsetZ = off.z;
         }
+        st.oscBound = oscIn.bound();
+        st.rayValid = anyRay;
+        st.rayNearest = rayHits > 0 ? nearestWall : 0.0;
+        st.rayHits = rayHits;
+        st.collisionActive = collisionActive;
         ui.update( cfg, st, dt );
 
         if ( ui.consumeResetHome() )
@@ -303,6 +369,23 @@ int main()
                 std::printf( "\n[hip offset calibration needs hip tracker + "
                              "HMD tracked]\n" );
             }
+        }
+
+        if ( ui.consumeLeanCalibrate() )
+        {
+            // capture the current (raw) lean as the neutral, so a balanced
+            // stance reads zero — separate from the hip-offset calibration
+            if ( bs.leanValid )
+            {
+                cfg.leanNeutralAlong = bs.leanRawAlong;
+                cfg.leanNeutralLateral = bs.leanRawLateral;
+                cfg.save();
+                std::printf( "\n[lean zeroed: along %.3f  lateral %.3f]\n",
+                             bs.leanRawAlong, bs.leanRawLateral );
+            }
+            else
+                std::printf( "\n[lean calibrate needs the board mounted + both "
+                             "feet tracked]\n" );
         }
 
         if ( ui.consumeCalibrate() )

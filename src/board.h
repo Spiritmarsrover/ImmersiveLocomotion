@@ -35,8 +35,10 @@ struct BoardStatus
     bool suspendBoost = false; // true from RearMounted on
     double liftDeltaY = 0.0;   // per-frame universe lift delta to apply
     // lean; normalized by half stance length. along: + = toward front foot.
-    double leanAlong = 0.0;
+    double leanAlong = 0.0;   // after the zero-lean calibration bias
     double leanLateral = 0.0;
+    double leanRawAlong = 0.0;   // before the bias (for the calibrate capture)
+    double leanRawLateral = 0.0;
     bool leanValid = false;
     // ride output
     double simSpeed = 0.0;     // signed, m/s along the board axis
@@ -54,6 +56,10 @@ public:
 
     BoardStatus update( const BodyState& body, bool grabLeft, bool grabRight,
                         const Config& cfg, double dt );
+
+    // Hard dismount: kick the rider off the board and zero its speed now (used
+    // by wall-hit detection). Returns to the belt with no glide-out.
+    void forceDismount();
 
 private:
     void setPhase( BoardPhase p );

@@ -342,6 +342,11 @@ void OverlayUI::buildUi( Config& cfg, const UiStatus& s )
                          s.leanLateral );
         else
             ImGui::TextDisabled( "lean: needs CoM + both feet tracked" );
+        if ( s.rayValid )
+            ImGui::Text( "nearest wall  %.2f m  (%d rays hitting)",
+                         s.rayNearest, s.rayHits );
+        else
+            ImGui::TextDisabled( "walls: no ray OSC (enable in Collision tab)" );
 
         if ( ImGui::Button( "Calibrate hip offset" ) )
             m_hipOffsetCalibrate = true;
@@ -349,6 +354,12 @@ void OverlayUI::buildUi( Config& cfg, const UiStatus& s )
         ImGui::TextDisabled( s.hipOffsetSet
                                  ? "set - stand in your riding stance to redo"
                                  : "stand in your riding stance, then click" );
+
+        if ( ImGui::Button( "Calibrate lean (zero)" ) )
+            m_leanCalibrate = true;
+        ImGui::SameLine();
+        ImGui::TextDisabled(
+            "stand balanced on the board, then click - zeroes the lean drift" );
 
         static const char* stanceItems[] = { "regular", "goofy" };
         changed |= comboStr( "stance (regular = right foot rear)",
@@ -385,6 +396,8 @@ void OverlayUI::buildUi( Config& cfg, const UiStatus& s )
         changed |= sliderD( "turn deadzone", cfg.turnDeadzone, 0.0f, 0.4f );
         changed |= sliderD( "pivot foot speed (m/s)", cfg.pivotFootSpeed,
                             0.1f, 2.0f );
+        changed |= sliderD( "direction smoothing (s, lower = less turn drift)",
+                            cfg.axisTau, 0.05f, 3.0f );
         static const char* rotItems[] = { "feet", "com", "hmd" };
         changed |= comboStr( "rotation center", cfg.rotationCenter, rotItems,
                              3 );
@@ -490,6 +503,67 @@ void OverlayUI::buildUi( Config& cfg, const UiStatus& s )
                 if ( ImGui::Button( "stop (speed 0)" ) )
                     m_oscDebugSpeed = 0.0f;
             }
+            ImGui::EndTabItem();
+        }
+        if ( ImGui::BeginTabItem( "Collision" ) )
+        {
+            ImGui::TextDisabled(
+                "Reads a VRCRaycast fan over OSC (VRChat OSC out = port 9001): "
+                "walls close in the ray fan while you're moving = a hit." );
+            ImGui::Spacing();
+
+            changed |= ImGui::Checkbox( "OSC input enabled (listen on this "
+                                        "port)",
+                                        &cfg.beaconEnabled );
+            float bport = static_cast<float>( cfg.beaconPort );
+            if ( ImGui::SliderFloat( "listen port", &bport, 9000.0f, 9200.0f,
+                                     "%.0f" ) )
+            {
+                cfg.beaconPort = bport;
+                changed = true;
+            }
+            if ( !cfg.beaconEnabled )
+                ImGui::TextDisabled( "listening: off" );
+            else if ( s.oscBound )
+                ImGui::TextColored( ImVec4( 0.3f, 1.0f, 0.4f, 1.0f ),
+                                    "listening on %d",
+                                    static_cast<int>( cfg.beaconPort ) );
+            else
+                ImGui::TextColored( ImVec4( 1.0f, 0.4f, 0.3f, 1.0f ),
+                                    "port %d IN USE - another app/overlay has "
+                                    "it", static_cast<int>( cfg.beaconPort ) );
+
+            ImGui::SeparatorText( "raycast fan" );
+            ImGui::TextDisabled(
+                "VRCRaycast params <prefix>N_Hit / <prefix>N_Distance, "
+                "N = 0..count-1. Set the prefix + count on your avatar." );
+            int rc = static_cast<int>( cfg.rayCount );
+            if ( ImGui::SliderInt( "ray count", &rc, 1, 16 ) )
+            {
+                cfg.rayCount = rc;
+                changed = true;
+            }
+            if ( s.rayValid )
+                ImGui::Text( "nearest wall:  %.2f m   (%d rays hitting)",
+                             s.rayNearest, s.rayHits );
+            else
+                ImGui::TextDisabled( "nearest wall: no ray OSC yet (enable + "
+                                     "VRChat OSC on + IL_Ray* params exist)" );
+
+            ImGui::SeparatorText( "wall-hit detection" );
+            changed |= ImGui::Checkbox( "detect wall hits (dismount when a wall "
+                                        "is close)", &cfg.collisionDetect );
+            changed |= sliderD( "dismount distance (m)", cfg.rayThreshold, 0.05f,
+                                2.0f );
+            changed |= sliderD( "hold after hit (s)", cfg.collisionHold, 0.05f,
+                                1.0f );
+            changed |= sliderD( "arm after moving (s)",
+                                cfg.collisionStartupIgnore, 0.0f, 1.0f );
+            if ( s.collisionActive )
+                ImGui::TextColored( ImVec4( 1.0f, 0.4f, 0.3f, 1.0f ),
+                                    "WALL HIT - dismounted" );
+            else
+                ImGui::TextDisabled( "no wall hit" );
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -607,6 +681,13 @@ bool OverlayUI::consumeCalibrate()
 {
     bool c = m_calibrate;
     m_calibrate = false;
+    return c;
+}
+
+bool OverlayUI::consumeLeanCalibrate()
+{
+    bool c = m_leanCalibrate;
+    m_leanCalibrate = false;
     return c;
 }
 

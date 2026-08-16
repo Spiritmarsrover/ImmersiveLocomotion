@@ -265,6 +265,12 @@ bool Config::loadOrCreate()
         if ( it != kv.end() )
             out = lower( it->second );
     };
+    // case-preserving variant: OSC parameter names are case-sensitive
+    auto strRaw = [&]( const char* k, std::string& out ) {
+        auto it = kv.find( k );
+        if ( it != kv.end() )
+            out = it->second;
+    };
 
     num( "boost.gain", gain );
     num( "boost.max_boost_speed", maxBoostSpeed );
@@ -332,6 +338,9 @@ bool Config::loadOrCreate()
     num( "board.turn_rate", turnRate );
     num( "board.turn_deadzone", turnDeadzone );
     num( "board.pivot_foot_speed", pivotFootSpeed );
+    num( "board.axis_tau", axisTau );
+    num( "board.lean_neutral_along", leanNeutralAlong );
+    num( "board.lean_neutral_lateral", leanNeutralLateral );
     str( "board.rotation_center", rotationCenter );
 
     boolean( "osc.enabled", oscEnabled );
@@ -341,6 +350,16 @@ bool Config::loadOrCreate()
     str( "input.source", source );
     str( "input.stick_mode", stickMode );
     num( "input.stick_full_at", stickFullAt );
+
+    boolean( "osc_in.enabled", beaconEnabled );
+    num( "osc_in.port", beaconPort );
+
+    boolean( "collision.detect", collisionDetect );
+    strRaw( "collision.ray_param", rayParam );
+    num( "collision.ray_count", rayCount );
+    num( "collision.ray_threshold", rayThreshold );
+    num( "collision.hold", collisionHold );
+    num( "collision.startup_ignore", collisionStartupIgnore );
 
     lastWriteTime = mtimeOf( path );
     return true;
@@ -433,6 +452,9 @@ bool Config::save()
     out << "turn_rate = " << turnRate << "\n";
     out << "turn_deadzone = " << turnDeadzone << "\n";
     out << "pivot_foot_speed = " << pivotFootSpeed << "\n";
+    out << "axis_tau = " << axisTau << "\n";
+    out << "lean_neutral_along = " << leanNeutralAlong << "\n";
+    out << "lean_neutral_lateral = " << leanNeutralLateral << "\n";
     out << "rotation_center = " << rotationCenter << "\n\n";
     out << "[osc]\n";
     out << "enabled = " << b( oscEnabled ) << "\n";
@@ -441,7 +463,17 @@ bool Config::save()
     out << "[input]\n";
     out << "source = " << source << "\n";
     out << "stick_mode = " << stickMode << "\n";
-    out << "stick_full_at = " << stickFullAt << "\n";
+    out << "stick_full_at = " << stickFullAt << "\n\n";
+    out << "[osc_in]\n";
+    out << "enabled = " << b( beaconEnabled ) << "\n";
+    out << "port = " << beaconPort << "\n\n";
+    out << "[collision]\n";
+    out << "detect = " << b( collisionDetect ) << "\n";
+    out << "ray_param = " << rayParam << "\n";
+    out << "ray_count = " << rayCount << "\n";
+    out << "ray_threshold = " << rayThreshold << "\n";
+    out << "hold = " << collisionHold << "\n";
+    out << "startup_ignore = " << collisionStartupIgnore << "\n";
     out.close();
     lastWriteTime = mtimeOf( path );
     return true;
