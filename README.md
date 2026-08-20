@@ -90,8 +90,12 @@ The **Playspace offset → backend** selector chooses who owns the offset:
 - **`ovr`** — hand the offset to a **forked OVR Advanced Settings** over a
   small UDP control port (`127.0.0.1:9210`, configurable), so OVRAS is the
   single space authority and the two apps never fight over the chaperone.
-  This needs the companion fork (its `MoveCenterTabController` listens on that
-  port); stock OVRAS ignores the messages.
+  This needs the companion fork
+  ([Spiritmarsrover/OpenVR-AdvancedSettings](https://github.com/Spiritmarsrover/OpenVR-AdvancedSettings),
+  prebuilt portable Windows build on its
+  [releases page](https://github.com/Spiritmarsrover/OpenVR-AdvancedSettings/releases));
+  its `MoveCenterTabController` listens on that port and stock OVRAS ignores
+  the messages.
 
   IL streams **per-frame deltas** (`/il/space/move`, an OSC `,ffff` of
   `dx dy dz dRotCentideg`) which OVRAS integrates with `modOffset` plus an
