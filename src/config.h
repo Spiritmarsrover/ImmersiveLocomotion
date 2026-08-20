@@ -42,7 +42,7 @@ struct Config
     bool useDriverVelocity = true; // pose vVelocity vs finite differencing
     double weightHmd = 1.24;
     double weightHands = 0.62;
-    double weightWaist = 3.03;
+    double weightWaist = 1.89;
     double weightFeet = 1.09;
     double weightOther = 0.37;
 
@@ -68,13 +68,13 @@ struct Config
     double boardLength = 0.73;    // m
     double boardWidth = 0.28;     // m
     double dismountRaise = 0.07;  // foot above mount baseline -> dismount
-    double pivotSpeed = 1.5;      // m/s; below = pivot regime (used later)
-    double liftHeight = 0.04;     // m universe lift while riding
+    double pivotSpeed = 1.11;     // m/s; below = pivot regime (used later)
+    double liftHeight = 0.1;      // m universe lift while riding
     double restPitchDeg = 25.0;   // nose-up pitch of the resting board
     double grabRadius = 0.15;     // m hand-to-hip distance to grab the board
     // ride physics: v' = accel_gain*lean - drag*v*|v|
     double accelGain = 10.0;      // m/s^2 at full (normalized) lean
-    double dragCoeff = 0.12;      // quadratic drag
+    double dragCoeff = 0.059;     // quadratic drag
     double leanDeadzone = 0.01;   // normalized lean ignored around neutral
     // per-axis lean sensitivity: physical CoM shift is much smaller fore/aft
     // than laterally (same half-stance normalization), so each axis gets its
@@ -85,7 +85,7 @@ struct Config
     // punchier at the extremes; 1 = linear)
     double leanGamma = 1.36; // throttle (along)
     double turnGamma = 1.26; // turn (lateral)
-    double boardMaxSpeed = 13.81; // m/s hard cap
+    double boardMaxSpeed = 15.0;  // m/s hard cap
     double turnRate = 180.0;      // deg/s at full lateral lean (negative flips)
     bool boardLeanTurn = true;    // lean carve rotates the playspace; off = no
                                   // lean-driven yaw (translation only)
@@ -95,7 +95,7 @@ struct Config
     // (s time-constant). Lower = axis follows your turn faster, so a slow
     // foot-turn builds less spurious lateral lean (less unwanted carve);
     // higher = steadier heading. During a pivot it snaps fast regardless.
-    double axisTau = 1.5;
+    double axisTau = 0.19;
     // zero-lean calibration: neutral-stance lean captured by the Calibrate
     // lean button, subtracted so a balanced stance reads 0 (separate from the
     // hip-offset calibration). Per-user; left neutral by default.
@@ -125,11 +125,11 @@ struct Config
     bool collisionDetect = false;
     std::string rayParam = "IL_Ray";      // VRCRaycast Parameter prefix
     double rayCount = 8;                  // number of rays in the fan
-    double rayThreshold = 0.15;           // m; nearest hit under this = a wall
+    double rayThreshold = 0.5;            // m; nearest hit under this = a wall
                                           // (keep >= the ray length so any hit
                                           // counts; short ~0.1 m rays -> ~0.15)
-    double collisionHold = 0.3;           // s to keep the push cut after a hit
-    double collisionStartupIgnore = 0.25; // s of commanded motion before arming
+    double collisionHold = 0.05;          // s to keep the push cut after a hit
+    double collisionStartupIgnore = 0.22; // s of commanded motion before arming
 
     // [space]  (playspace backend: our own mover, or delegate the offset to a
     // ported OVR Advanced Settings over OSC/UDP so OVRAS is the sole authority
