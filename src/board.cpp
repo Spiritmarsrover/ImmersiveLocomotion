@@ -152,9 +152,25 @@ void Board::land( const BodyState& body, const Config& cfg )
     double m11 = r2s.m[1][1];
     if ( std::fabs( m11 ) < 0.5 )
         m11 = 1.0; // degenerate calibration; assume raw y up
-    m_floorY = -( r2s.m[1][0] * center.x + r2s.m[1][2] * center.z
-                  + r2s.m[1][3] )
-               / m11;
+    double baseFloorY = -( r2s.m[1][0] * center.x + r2s.m[1][2] * center.z
+                           + r2s.m[1][3] )
+                        / m11;
+    // The standing-y=0 plane moves with the live playspace offset (OVRAS drives
+    // it up/down), so a rider who has raised their playspace ends up floating
+    // above it and the board spawns under the floor. Anchor to the rider's
+    // actual feet in RAW space instead: that is their physical floor and is
+    // invariant to any playspace offset. Board mode requires foot trackers, so
+    // feet are reliable at throw time; fall back to the standing plane if not.
+    bool haveFeet = body.footLeftValid || body.footRightValid;
+    double feetY;
+    if ( body.footLeftValid && body.footRightValid )
+        feetY = body.footLeft.y < body.footRight.y ? body.footLeft.y
+                                                   : body.footRight.y;
+    else if ( body.footLeftValid )
+        feetY = body.footLeft.y;
+    else
+        feetY = body.footRight.y;
+    m_floorY = haveFeet ? feetY : baseFloorY;
 
     m_axis = facing;
     m_tail = { center.x - m_axis.x * cfg.boardLength * 0.5, m_floorY,
@@ -575,8 +591,10 @@ BoardStatus Board::update( const BodyState& body, bool grabLeft,
                                      / ( 0.6 * cfg.pivotSpeed ),
                                  0.0, 1.0 );
             double travelSign = m_simSpeed >= 0.0 ? 1.0 : -1.0;
-            st.yawDelta
-                = cfg.turnRate * kPi / 180.0 * lt * ramp * travelSign * dt;
+            st.yawDelta = cfg.boardLeanTurn
+                              ? cfg.turnRate * kPi / 180.0 * lt * ramp
+                                    * travelSign * dt
+                              : 0.0;
         }
 
         // rotation center for the artificial yaw

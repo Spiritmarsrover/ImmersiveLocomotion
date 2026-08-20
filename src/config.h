@@ -87,6 +87,8 @@ struct Config
     double turnGamma = 1.26; // turn (lateral)
     double boardMaxSpeed = 13.81; // m/s hard cap
     double turnRate = 180.0;      // deg/s at full lateral lean (negative flips)
+    bool boardLeanTurn = true;    // lean carve rotates the playspace; off = no
+                                  // lean-driven yaw (translation only)
     double turnDeadzone = 0.01;   // normalized lateral lean ignored
     double pivotFootSpeed = 0.1;  // m/s front-foot speed that opens the gate
     // how fast the board axis re-aligns to the feet line while NOT pivoting
@@ -128,6 +130,13 @@ struct Config
                                           // counts; short ~0.1 m rays -> ~0.15)
     double collisionHold = 0.3;           // s to keep the push cut after a hit
     double collisionStartupIgnore = 0.25; // s of commanded motion before arming
+
+    // [space]  (playspace backend: our own mover, or delegate the offset to a
+    // ported OVR Advanced Settings over OSC/UDP so OVRAS is the sole authority
+    // on the chaperone offset)
+    std::string spaceBackend = "il"; // il | ovr
+    std::string ovrIp = "127.0.0.1"; // OVRAS control host
+    double ovrPort = 9210;           // OVRAS IL-control UDP port
 
     // -- not in the file --
     std::string path;

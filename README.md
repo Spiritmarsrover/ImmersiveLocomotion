@@ -82,6 +82,27 @@ uses the yaw term; boost uses translation only. The commit-time bounds
 counter-transform generalizes to `corner' = S0^-1 * M^-1 * S0 * corner`,
 which reduces to `corner + R_S^-1 * total` for the translation-only case.
 
+### Backend: `il` (built-in mover) vs `ovr` (drive OVRAS)
+
+The **Playspace offset → backend** selector chooses who owns the offset:
+
+- **`il`** (default) — the built-in episode mover described above.
+- **`ovr`** — hand the offset to a **forked OVR Advanced Settings** over a
+  small UDP control port (`127.0.0.1:9210`, configurable), so OVRAS is the
+  single space authority and the two apps never fight over the chaperone.
+  This needs the companion fork (its `MoveCenterTabController` listens on that
+  port); stock OVRAS ignores the messages.
+
+  IL streams **per-frame deltas** (`/il/space/move`, an OSC `,ffff` of
+  `dx dy dz dRotCentideg`) which OVRAS integrates with `modOffset` plus an
+  incremental `setRotation`. Because it is incremental, OVRAS's own reset and
+  its HMD-centered rotation compensation both survive between frames (an
+  absolute stream clobbered them). IL sends the deltas in **raw tracking**
+  axes; the fork rotates them into its reset-center basis — the standing-zero
+  pose carries your room-calibration yaw — so forward stays forward, and it
+  forces "universe centered rotation" off so carving pivots about you, not the
+  room. In this mode IL's own reset button is disabled (reset from OVRAS).
+
 ## Mode 2: Electric board
 
 Onewheel-inspired, skateboard stance. Lifecycle is a state machine
@@ -104,13 +125,20 @@ each frame) and recolors per phase.
   speed, fast front-foot motion opens a **pivot gate** that suspends lean
   input so you physically rotate your body (the board tracks your feet
   line). At speed, lateral lean drives **artificial yaw** about a
-  configurable center (`feet | com | hmd`).
+  configurable center (`feet | com | hmd`). The lean-driven yaw can be turned
+  off entirely with the **lean rotation** toggle for translation-only carving.
 - **Mount/dismount** — rear foot first, then front. Dismount by raising
   either foot `dismount_raise` above its planted height (a running minimum,
   so the threshold is honest), or a horizontal bail above pivot speed. The
   board auto-returns to your belt; a `mount_grace` window prevents the
   settling step from instantly dismounting you. Activation lifts you a few
   cm as a "board is live" cue.
+- **Landing height** — the thrown board floor is anchored to your tracked
+  feet in raw space, not to the chaperone `y = 0` plane. That plane moves
+  with the live playspace offset (the `ovr` backend drives it up and down),
+  so anchoring to feet keeps a board thrown while your playspace is raised
+  landing under your feet instead of sinking below the floor. Falls back to
+  the standing-zero plane if feet aren't tracked.
 - **Hip offset calibration** — many users wear the hip tracker on the side.
   The **Calibrate hip offset** button stores the midpoint between your
   controllers (held at your hips) in tracker-local space, so the CoM sits
@@ -200,6 +228,11 @@ Controller Bindings once and reselect the default binding.
 ## Known Issues
 Human in the loop here, despite what some of the rest of the readme says, some of OVR advancded settings playspace mover collide not very well with the offset gained from moving with this. 
 Use of a playspace mover or any space fix will probably reset the offset gained from moving. So be careful when using both. 
+
+The **`ovr` backend** (see [Backend](#backend-il-built-in-mover-vs-ovr-drive-ovras))
+is the clean fix for this when you run the companion OVRAS fork: OVRAS becomes
+the single space authority, so its space drag/turn and IL's motion compose
+instead of resetting each other. With stock `il` mode the caveat above stands.
 
 ## License
 

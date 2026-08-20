@@ -19,6 +19,10 @@ public:
 
     void sendBool( const char* address, bool v );
     void sendFloat( const char* address, float v );
+    // <address> ,ffff a b c d  (4 big-endian floats)
+    void sendFloat4( const char* address, float a, float b, float c, float d );
+    // <address> ,   (argument-less message)
+    void sendEmpty( const char* address );
 
 private:
     bool ensureSocket();

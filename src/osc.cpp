@@ -123,6 +123,29 @@ void OscSender::sendFloat( const char* address, float v )
     sendBuf( buf, static_cast<int>( p - buf ) );
 }
 
+void OscSender::sendFloat4( const char* address, float a, float b, float c,
+                            float d )
+{
+    uint8_t buf[512];
+    uint8_t* p = buf;
+    putString( p, address );
+    putString( p, ",ffff" );
+    putFloatBE( p, a );
+    putFloatBE( p, b );
+    putFloatBE( p, c );
+    putFloatBE( p, d );
+    sendBuf( buf, static_cast<int>( p - buf ) );
+}
+
+void OscSender::sendEmpty( const char* address )
+{
+    uint8_t buf[512];
+    uint8_t* p = buf;
+    putString( p, address );
+    putString( p, "," );
+    sendBuf( buf, static_cast<int>( p - buf ) );
+}
+
 // ---- OscReceiver ----
 
 OscReceiver::~OscReceiver()

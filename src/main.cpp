@@ -107,10 +107,15 @@ int main()
 
     OscSender osc;
     OscReceiver oscIn; // avatar-position beacon (/il/avatar_pos)
+    OscSender ovrOut;  // ovr-space backend: drive OVRAS's offset over OSC
 
     // wall-hit detection state (VRCRaycast fan)
     double commandingTime = 0.0; // how long we've been commanding motion
     double collisionTimer = 0.0; // > 0 while the push is suppressed post-hit
+
+    // ovr-space backend: we stream per-frame offset+rotation deltas to OVRAS
+    bool ovrResetPending = true; // send one reset when (re)entering ovr space
+    constexpr double kRadToCentideg = 18000.0 / 3.14159265358979323846;
 
     float displayHz = vr::VRSystem()->GetFloatTrackedDeviceProperty(
         vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_DisplayFrequency_Float );
@@ -269,7 +274,39 @@ int main()
             yaw = 0.0;
             collisionTimer -= dt;
         }
-        mover.update( frameDelta, yaw, bs.yawPivot, dt, cfg.adjustBounds );
+
+        // --- apply this frame's motion: our own mover, or delegate the offset
+        //     to a ported OVR Advanced Settings over OSC (single authority) ---
+        if ( cfg.spaceBackend == "ovr" )
+        {
+            ovrOut.setDest( cfg.ovrIp, static_cast<int>( cfg.ovrPort ) );
+            if ( ovrResetPending )
+            {
+                ovrOut.sendEmpty( "/il/space/reset" );
+                ovrResetPending = false;
+            }
+            // Incremental protocol: OVRAS integrates each frame's delta, so its
+            // own HMD-centered rotation compensation and its reset both survive
+            // (an absolute stream clobbered them). OVRAS moves the rider by
+            // -offset, matching IL's own mover (which uses -deltaRaw), so send
+            // the NEGATED translation. Transmit only when something actually
+            // moved, so a reset issued from OVRAS is not instantly overwritten.
+            const double dRotCd = yaw * kRadToCentideg;
+            if ( frameDelta.x != 0.0 || frameDelta.y != 0.0
+                 || frameDelta.z != 0.0 || dRotCd != 0.0 )
+            {
+                ovrOut.sendFloat4( "/il/space/move",
+                                   static_cast<float>( -frameDelta.x ),
+                                   static_cast<float>( -frameDelta.y ),
+                                   static_cast<float>( -frameDelta.z ),
+                                   static_cast<float>( dRotCd ) );
+            }
+        }
+        else
+        {
+            ovrResetPending = true; // re-arm for the next switch into ovr space
+            mover.update( frameDelta, yaw, bs.yawPivot, dt, cfg.adjustBounds );
+        }
 
         // --- OSC avatar output: board active + wheel speed (every frame, so
         // the avatar's motor pitch/volume gets a smooth signal, not steps) ---
@@ -330,7 +367,12 @@ int main()
         ui.update( cfg, st, dt );
 
         if ( ui.consumeResetHome() )
-            mover.resetOffset();
+        {
+            if ( cfg.spaceBackend == "ovr" )
+                ovrResetPending = true; // reset OVRAS + our accumulator next frame
+            else
+                mover.resetOffset();
+        }
         if ( ui.consumeQuit() )
             g_running = false;
         if ( ui.consumeOpenBindings() )
@@ -455,6 +497,11 @@ int main()
     // exit (no update loop left to settle it).
     if ( cfg.resetOnStart )
     {
+        if ( cfg.spaceBackend == "ovr" )
+        {
+            ovrOut.setDest( cfg.ovrIp, static_cast<int>( cfg.ovrPort ) );
+            ovrOut.sendEmpty( "/il/space/reset" );
+        }
         mover.resetOffset();
         mover.finish( cfg.adjustBounds );
     }

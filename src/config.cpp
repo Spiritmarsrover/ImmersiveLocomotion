@@ -336,6 +336,7 @@ bool Config::loadOrCreate()
     num( "board.turn_gamma", turnGamma );
     num( "board.board_max_speed", boardMaxSpeed );
     num( "board.turn_rate", turnRate );
+    boolean( "board.lean_turn", boardLeanTurn );
     num( "board.turn_deadzone", turnDeadzone );
     num( "board.pivot_foot_speed", pivotFootSpeed );
     num( "board.axis_tau", axisTau );
@@ -360,6 +361,10 @@ bool Config::loadOrCreate()
     num( "collision.ray_threshold", rayThreshold );
     num( "collision.hold", collisionHold );
     num( "collision.startup_ignore", collisionStartupIgnore );
+
+    strRaw( "space.backend", spaceBackend );
+    strRaw( "space.ovr_ip", ovrIp );
+    num( "space.ovr_port", ovrPort );
 
     lastWriteTime = mtimeOf( path );
     return true;
@@ -450,6 +455,7 @@ bool Config::save()
     out << "turn_gamma = " << turnGamma << "\n";
     out << "board_max_speed = " << boardMaxSpeed << "\n";
     out << "turn_rate = " << turnRate << "\n";
+    out << "lean_turn = " << b( boardLeanTurn ) << "\n";
     out << "turn_deadzone = " << turnDeadzone << "\n";
     out << "pivot_foot_speed = " << pivotFootSpeed << "\n";
     out << "axis_tau = " << axisTau << "\n";
@@ -473,7 +479,11 @@ bool Config::save()
     out << "ray_count = " << rayCount << "\n";
     out << "ray_threshold = " << rayThreshold << "\n";
     out << "hold = " << collisionHold << "\n";
-    out << "startup_ignore = " << collisionStartupIgnore << "\n";
+    out << "startup_ignore = " << collisionStartupIgnore << "\n\n";
+    out << "[space]\n";
+    out << "backend = " << spaceBackend << "\n";
+    out << "ovr_ip = " << ovrIp << "\n";
+    out << "ovr_port = " << ovrPort << "\n";
     out.close();
     lastWriteTime = mtimeOf( path );
     return true;

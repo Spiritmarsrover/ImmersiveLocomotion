@@ -391,6 +391,8 @@ void OverlayUI::buildUi( Config& cfg, const UiStatus& s )
         changed |= sliderD( "turn gamma", cfg.turnGamma, 0.3f, 4.0f );
         changed |= sliderD( "max speed (m/s)", cfg.boardMaxSpeed, 1.0f,
                             15.0f );
+        changed |= ImGui::Checkbox( "lean rotation (carve turns the playspace)",
+                                    &cfg.boardLeanTurn );
         changed |= sliderD( "turn rate (deg/s, +/- flips)", cfg.turnRate,
                             -180.0f, 180.0f, "%.0f" );
         changed |= sliderD( "turn deadzone", cfg.turnDeadzone, 0.0f, 0.4f );
@@ -407,11 +409,37 @@ void OverlayUI::buildUi( Config& cfg, const UiStatus& s )
     {
         ImGui::Text( "applied offset (m):  x %+.2f   y %+.2f   z %+.2f",
                      s.offsetX, s.offsetY, s.offsetZ );
+        // In ovr mode OVRAS owns the space, so its own reset is the authority;
+        // ours fights the per-frame /il/space/set stream. Grey it out there.
+        const bool ovrSpace = ( cfg.spaceBackend == "ovr" );
+        ImGui::BeginDisabled( ovrSpace );
         if ( ImGui::Button( "Reset playspace offset" ) )
             m_resetHome = true;
-        ImGui::TextDisabled( "undone automatically on launch/exit" );
+        ImGui::EndDisabled();
+        if ( ovrSpace )
+            ImGui::TextDisabled( "reset from OVR Advanced Settings in ovr mode" );
+        else
+            ImGui::TextDisabled( "undone automatically on launch/exit" );
         changed |= ImGui::Checkbox( "reset offset on launch/exit",
                                     &cfg.resetOnStart );
+
+        ImGui::SeparatorText( "backend" );
+        static const char* spaceItems[] = { "il", "ovr" };
+        changed |= comboStr(
+            "space (ovr = drive OVR Advanced Settings instead of our mover)",
+            cfg.spaceBackend, spaceItems, 2 );
+        if ( cfg.spaceBackend == "ovr" )
+        {
+            float op = static_cast<float>( cfg.ovrPort );
+            if ( ImGui::SliderFloat( "OVRAS control port", &op, 9200.0f,
+                                     9300.0f, "%.0f" ) )
+            {
+                cfg.ovrPort = op;
+                changed = true;
+            }
+            ImGui::TextDisabled( "sends /il/space/set to a ported OVRAS on this "
+                                 "port; our own mover is bypassed" );
+        }
     }
 
     if ( inSettings && ImGui::CollapsingHeader( "Mover / Input" ) )
